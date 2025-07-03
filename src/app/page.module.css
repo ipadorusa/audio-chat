@@ -383,5 +383,120 @@ a.secondary {
 }
 
 .info strong {
-  color: #333;
+  color: #667eea;
+}
+
+/* 마이크 상태 확인 섹션 */
+.micStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 1rem;
+}
+
+.micStatusInfo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.micCheckButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.micCheckButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.micCheckButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 오디오 레벨 표시 */
+.audioLevel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-radius: 12px;
+  border: 1px solid #90caf9;
+}
+
+.audioLevelBar {
+  width: 100%;
+  height: 20px;
+  background: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.audioLevelFill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #4caf50 0%,
+    #8bc34a 50%,
+    #ffc107 75%,
+    #ff5722 100%
+  );
+  border-radius: 10px;
+  transition: width 0.1s ease;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.audioLevelText {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 600px) {
+  .micStatus {
+    padding: 1rem;
+  }
+
+  .micStatusInfo {
+    font-size: 0.9rem;
+  }
+
+  .micCheckButton {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.8rem;
+  }
+
+  .audioLevel {
+    padding: 0.8rem;
+  }
+
+  .audioLevelBar {
+    height: 16px;
+  }
+
+  .audioLevelText {
+    font-size: 0.8rem;
+  }
 }
