@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, AlertCircle, Play, Pause } from 'lucide-react';
 
 const MicComponent = () => {
   const [isMicOn, setIsMicOn] = useState(false);
@@ -8,7 +8,48 @@ const MicComponent = () => {
   const [micStatus, setMicStatus] = useState('대기중');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const micStreamRef = useRef<MediaStream | null>(null);
+
+  // 클라이언트 사이드 확인
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // 테스트 오디오 재생
+  const playTestAudio = () => {
+    setIsAudioPlaying(true);
+
+    try {
+      // 매번 새로운 AudioContext 생성
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 음
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // 볼륨 낮게
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 1);
+
+      // 1초 후 상태 초기화
+      setTimeout(() => {
+        setIsAudioPlaying(false);
+        audioContext.close(); // AudioContext 정리
+      }, 1000);
+
+    } catch (error) {
+      console.error('테스트 오디오 재생 실패:', error);
+      setIsAudioPlaying(false);
+    }
+  };
 
   // 마이크 켜기
   const turnOnMic = async () => {
@@ -216,6 +257,17 @@ const MicComponent = () => {
     };
   }, []);
 
+  // 클라이언트 사이드가 아니면 로딩 표시
+  if (!isClient) {
+    return (
+      <div className="max-w-sm mx-auto p-6 bg-white rounded-lg shadow-md">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-sm mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-xl font-bold text-center mb-6 text-gray-800">
@@ -299,6 +351,25 @@ const MicComponent = () => {
       {/* 스피커 제어 */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-3 text-gray-700">스피커</h3>
+
+        {/* 테스트 오디오 섹션 */}
+        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="text-sm font-semibold text-blue-800 mb-2">테스트 오디오</h4>
+          <div className="flex space-x-2">
+            <button
+              onClick={playTestAudio}
+              disabled={isAudioPlaying}
+              className="flex items-center space-x-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-300"
+            >
+              {isAudioPlaying ? <Pause size={16} /> : <Play size={16} />}
+              <span>{isAudioPlaying ? '재생 중...' : '테스트 소리 재생'}</span>
+            </button>
+            <span className="text-xs text-blue-600 self-center">
+              (440Hz 사인파, 1초)
+            </span>
+          </div>
+        </div>
+
         <div className="flex space-x-3">
           <button
             onClick={turnOnSpeaker}
@@ -330,6 +401,18 @@ const MicComponent = () => {
           <span className={`text-sm font-medium ${isSpeakerOn ? 'text-green-600' : 'text-red-600'}`}>
             스피커: {isSpeakerOn ? '켜짐' : '꺼짐'}
           </span>
+        </div>
+
+        {/* 스피커 테스트 가이드 */}
+        <div className="mt-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+          <p className="text-xs text-yellow-700">
+            💡 <strong>스피커 테스트 방법:</strong><br />
+            1. &ldquo;테스트 소리 재생&rdquo; 버튼 클릭<br />
+            2. 소리가 들리면 스피커가 켜진 상태<br />
+            3. &ldquo;스피커 끄기&rdquo; 버튼 클릭<br />
+            4. 다시 &ldquo;테스트 소리 재생&rdquo; 클릭<br />
+            5. 소리가 안 들리면 스피커가 꺼진 상태
+          </p>
         </div>
       </div>
 
