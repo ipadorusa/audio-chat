@@ -10,11 +10,20 @@ export default function Home() {
   const [useWebSpeechAPI, setUseWebSpeechAPI] = useState(true);
   const [micStatus, setMicStatus] = useState<'unknown' | 'granted' | 'denied' | 'checking'>('unknown');
   const [audioLevel, setAudioLevel] = useState(0);
+  const [isWebSpeechSupported, setIsWebSpeechSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // 클라이언트 사이드에서만 실행되는 초기화
+  useEffect(() => {
+    // Web Speech API 지원 확인
+    if (typeof window !== 'undefined') {
+      setIsWebSpeechSupported('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+    }
+  }, []);
 
   // 마이크 권한 확인
   const checkMicrophonePermission = async () => {
@@ -87,14 +96,9 @@ export default function Home() {
     };
   }, []);
 
-  // Web Speech API 지원 확인
-  const isWebSpeechSupported = () => {
-    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-  };
-
   // Web Speech API로 음성 인식 시작
   const startWebSpeechRecognition = () => {
-    if (!isWebSpeechSupported()) {
+    if (!isWebSpeechSupported) {
       setError('이 브라우저는 음성 인식을 지원하지 않습니다.');
       return;
     }
@@ -260,7 +264,7 @@ export default function Home() {
           </label>
         </div>
 
-        {!isWebSpeechSupported() && useWebSpeechAPI && (
+        {!isWebSpeechSupported && useWebSpeechAPI && (
           <div className={styles.warning}>
             ⚠️ 이 브라우저는 Web Speech API를 지원하지 않습니다. Chrome, Edge, Safari를 사용해주세요.
           </div>
@@ -270,7 +274,7 @@ export default function Home() {
           <button
             onClick={toggleRecording}
             className={`${styles.recordButton} ${isRecording ? styles.recording : ''}`}
-            disabled={useWebSpeechAPI && !isWebSpeechSupported()}
+            disabled={useWebSpeechAPI && !isWebSpeechSupported}
           >
             {isRecording ? '음성 인식 중지' : '음성 인식 시작'}
           </button>

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 // API 사용 예시를 위한 엔드포인트
 export async function GET() {
