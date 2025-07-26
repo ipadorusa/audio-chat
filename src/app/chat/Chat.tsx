@@ -1,106 +1,148 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 // API 엔드포인트 - 나중에 실제 주소로 변경
 const API_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_API_URL || '/api/chat/save';
-type NewHistory = { type: 'question' | 'answer', text: string }[]
+type NewHistory = { type: "question" | 'answer', text: string }[]
+type Conversation = { question: string; answer: string }[];
+// 질문-답변 쌍으로 매핑하는 함수
+function mapChatHistoryToConversations(history: NewHistory) {
+  const conversations: Conversation = [];
+  for (let i = 0; i < history.length; i += 2) {
+    if (history[i]?.type === 'question' && history[i + 1]?.type === 'answer') {
+      conversations.push({
+        question: history[i].text,
+        answer: history[i + 1].text
+      });
+    }
+  }
+  return conversations;
+}
+
+// 진행률 계산 함수
+function getProgress(currentIndex: number, total: number) {
+  return `${currentIndex + 1}/${total}`;
+}
+
+// API로 데이터 전송하는 함수 (질문 배열도 인자로 받음)
+async function saveChatData({
+  finalHistory,
+  questionArr,
+  setIsSaving,
+  setSaveStatus
+}: {
+  finalHistory: { type: "question" | 'answer', text: string }[];
+  questionArr: string[];
+  setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
+  setSaveStatus: React.Dispatch<React.SetStateAction<'idle' | 'success' | 'error'>>;
+}) {
+  setIsSaving(true);
+  setSaveStatus('idle');
+  try {
+    const chatData = {
+      timestamp: new Date().toISOString(),
+      totalQuestions: questionArr.length,
+      conversations: mapChatHistoryToConversations(finalHistory)
+    };
+    console.log('저장할 데이터:', chatData);
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(chatData)
+    });
+    if (response.ok) {
+      setSaveStatus('success');
+      console.log('대화 데이터가 성공적으로 저장되었습니다.');
+    } else {
+      throw new Error(`API 호출 실패: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('대화 저장 중 오류:', error);
+    setSaveStatus('error');
+  } finally {
+    setIsSaving(false);
+  }
+}
 
 export default function Chat() {
-  const [question] = useState([
-    "안녕하세요",
-    "너는 누구냐?",
-    "오늘 날씨는 어때?",
-    "뭐 재미있는 이야기 없어?",
-    "취미가 뭐야?"
-  ])
-  const [chatHistory, setChatHistory] = useState<{ type: 'question' | 'answer', text: string }[]>([
-    { type: 'question', text: "안녕하세요" }
-  ]);
+  // 질문 리스트는 빈 배열로 시작
+  const [question, setQuestion] = useState<string[]>([]);
+  // chatHistory는 빈 배열로 시작
+  const [chatHistory, setChatHistory] = useState<{ type: "question" | 'answer', text: string }[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // API로 데이터 전송하는 함수
-  const saveChatData = async (finalHistory: { type: 'question' | 'answer', text: string }[]) => {
-    setIsSaving(true);
-    setSaveStatus('idle');
-
-    try {
-      // 질문-답변 쌍으로 데이터 정리
-      const chatData = {
-        timestamp: new Date().toISOString(),
-        totalQuestions: question.length,
-        conversations: [] as Array<{ question: string; answer: string }>
-      };
-
-      // 질문-답변 쌍으로 매핑
-      for (let i = 0; i < finalHistory.length; i += 2) {
-        if (finalHistory[i]?.type === 'question' && finalHistory[i + 1]?.type === 'answer') {
-          chatData.conversations.push({
-            question: finalHistory[i].text,
-            answer: finalHistory[i + 1].text
-          });
-        }
-      }
-
-      console.log('저장할 데이터:', chatData);
-
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chatData)
-      });
-
-      if (response.ok) {
-        setSaveStatus('success');
-        console.log('대화 데이터가 성공적으로 저장되었습니다.');
-      } else {
-        throw new Error(`API 호출 실패: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('대화 저장 중 오류:', error);
-      setSaveStatus('error');
-    } finally {
-      setIsSaving(false);
+  // 질문 리스트를 API에서 받아오는 부분 (여기선 예시로 setTimeout 사용)
+  useEffect(() => {
+    async function fetchQuestions() {
+      // 실제 API 호출로 대체
+      // const res = await fetch('/api/your-question-endpoint');
+      // const data = await res.json();
+      // setQuestion(data.questions);
+      // 예시 데이터
+      setTimeout(() => {
+        setQuestion([
+          "안녕하세요",
+          "너는 누구냐?",
+          "오늘 날씨는 어때?",
+          "뭐 재미있는 이야기 없어?",
+          "취미가 뭐야?"
+        ]);
+      }, 100);
     }
-  };
+    fetchQuestions();
+  }, []);
 
+  // question이 세팅되면 chatHistory 초기화
+  useEffect(() => {
+    if (question.length > 0) {
+      setChatHistory([{ type: "question", text: question[0] }]);
+      setCurrentQuestionIndex(0);
+      setIsCompleted(false);
+      setIsSaving(false);
+      setSaveStatus('idle');
+      setInputValue("");
+    }
+  }, [question]);
+
+  // 답변 전송 핸들러
   const handleSend = () => {
     if (inputValue.trim()) {
-      // 답변 추가
-      const newHistory: NewHistory = [...chatHistory, { type: 'answer', text: inputValue }];
-
-      // 다음 질문이 있으면 추가
+      const newHistory: NewHistory = [...chatHistory, { type: "answer", text: inputValue }];
       if (currentQuestionIndex < question.length - 1) {
         const nextQuestionIndex = currentQuestionIndex + 1;
-        newHistory.push({ type: 'question', text: question[nextQuestionIndex] });
+        newHistory.push({ type: "question", text: question[nextQuestionIndex] });
         setCurrentQuestionIndex(nextQuestionIndex);
         setChatHistory(newHistory);
       } else {
-        // 마지막 질문 완료
         setChatHistory(newHistory);
         setIsCompleted(true);
-
-        // API로 데이터 저장
-        saveChatData(newHistory);
+        saveChatData({
+          finalHistory: newHistory,
+          questionArr: question,
+          setIsSaving,
+          setSaveStatus
+        });
       }
-
       setInputValue("");
     }
   }
 
   // 새로 시작하기
   const handleRestart = () => {
-    setChatHistory([{ type: 'question', text: question[0] }]);
-    setCurrentQuestionIndex(0);
-    setIsCompleted(false);
-    setIsSaving(false);
-    setSaveStatus('idle');
-    setInputValue("");
+    if (question.length > 0) {
+      setChatHistory([{ type: "question", text: question[0] }]);
+      setCurrentQuestionIndex(0);
+      setIsCompleted(false);
+      setIsSaving(false);
+      setSaveStatus('idle');
+      setInputValue("");
+    }
   };
 
   return (
@@ -116,8 +158,6 @@ export default function Chat() {
             </div>
           </div>
         ))}
-
-        {/* 완료 메시지 */}
         {isCompleted && (
           <div className="flex justify-center">
             <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg">
@@ -129,7 +169,6 @@ export default function Chat() {
           </div>
         )}
       </div>
-
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         {!isCompleted ? (
           <div className="flex space-x-2">
@@ -175,11 +214,9 @@ export default function Chat() {
             </button>
           </div>
         )}
-
-        {/* 진행률 표시 */}
         {!isCompleted && (
           <div className="mt-2 text-center text-gray-500 text-xs">
-            진행률: {currentQuestionIndex + 1}/{question.length}
+            진행률: {getProgress(currentQuestionIndex, question.length)}
           </div>
         )}
       </div>
