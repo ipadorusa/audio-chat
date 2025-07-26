@@ -1,23 +1,29 @@
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 
 // API 엔드포인트 - 나중에 실제 주소로 변경
 const API_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_API_URL || '/api/chat/save';
-type NewHistory = { type: "question" | 'answer', text: string }[]
+type NewHistory = { type: "question" | 'answer', text: string }[];
 type Conversation = { question: string; answer: string }[];
+
 // 질문-답변 쌍으로 매핑하는 함수
-function mapChatHistoryToConversations(history: NewHistory) {
+function mapChatHistoryToConversations(history: NewHistory): Conversation {
   const conversations: Conversation = [];
-  for (let i = 0; i < history.length; i += 2) {
-    if (history[i]?.type === 'question' && history[i + 1]?.type === 'answer') {
+
+  for (let i = 0; i < history.length - 1; i += 2) {
+    const question = history[i];
+    const answer = history[i + 1];
+
+    if (question?.type === 'question' && answer?.type === 'answer') {
       conversations.push({
-        question: history[i].text,
-        answer: history[i + 1].text
+        question: question.text,
+        answer: answer.text
       });
     }
   }
   return conversations;
 }
+
 
 // 진행률 계산 함수
 function getProgress(currentIndex: number, total: number) {
@@ -31,7 +37,7 @@ async function saveChatData({
   setIsSaving,
   setSaveStatus
 }: {
-  finalHistory: { type: "question" | 'answer', text: string }[];
+  finalHistory: NewHistory;
   questionArr: string[];
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
   setSaveStatus: React.Dispatch<React.SetStateAction<'idle' | 'success' | 'error'>>;
@@ -70,12 +76,24 @@ export default function Chat() {
   // 질문 리스트는 빈 배열로 시작
   const [question, setQuestion] = useState<string[]>([]);
   // chatHistory는 빈 배열로 시작
-  const [chatHistory, setChatHistory] = useState<{ type: "question" | 'answer', text: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<NewHistory>([]);
   const [inputValue, setInputValue] = useState("");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // 상태 초기화 함수
+  const resetState = useCallback(() => {
+    if (question.length > 0) {
+      setChatHistory([{ type: "question", text: question[0] }]);
+      setCurrentQuestionIndex(0);
+      setIsCompleted(false);
+      setIsSaving(false);
+      setSaveStatus('idle');
+      setInputValue("");
+    }
+  }, [question]);
 
   // 질문 리스트를 API에서 받아오는 부분 (여기선 예시로 setTimeout 사용)
   useEffect(() => {
@@ -100,15 +118,8 @@ export default function Chat() {
 
   // question이 세팅되면 chatHistory 초기화
   useEffect(() => {
-    if (question.length > 0) {
-      setChatHistory([{ type: "question", text: question[0] }]);
-      setCurrentQuestionIndex(0);
-      setIsCompleted(false);
-      setIsSaving(false);
-      setSaveStatus('idle');
-      setInputValue("");
-    }
-  }, [question]);
+    resetState();
+  }, [resetState]);
 
   // 답변 전송 핸들러
   const handleSend = () => {
@@ -135,14 +146,7 @@ export default function Chat() {
 
   // 새로 시작하기
   const handleRestart = () => {
-    if (question.length > 0) {
-      setChatHistory([{ type: "question", text: question[0] }]);
-      setCurrentQuestionIndex(0);
-      setIsCompleted(false);
-      setIsSaving(false);
-      setSaveStatus('idle');
-      setInputValue("");
-    }
+    resetState();
   };
 
   return (
