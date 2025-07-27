@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // 타입 정의
 type ChatMessage = { type: "question" | 'answer', text: string }
@@ -108,7 +108,7 @@ const saveChatData = async ({
 }
 
 // 채팅 메시지 컴포넌트
-const ChatMessage = ({
+const ChatMessage = React.memo(({
   message,
   index,
   isCurrentQuestion,
@@ -122,7 +122,7 @@ const ChatMessage = ({
   const isQuestion = message.type === 'question'
   const isCurrent = isCurrentQuestion(index)
 
-  const getMessageClasses = () => {
+  const messageClasses = useMemo(() => {
     if (isQuestion) {
       return isCurrent
         ? 'bg-blue-500 text-white rounded-br-lg rounded-tl-lg rounded-tr-lg'
@@ -130,11 +130,11 @@ const ChatMessage = ({
     } else {
       return 'bg-green-500 text-white rounded-bl-lg rounded-tl-lg rounded-tr-lg'
     }
-  }
+  }, [isQuestion, isCurrent])
 
   return (
     <div className={`flex ${isQuestion ? 'justify-start' : 'justify-end'}`}>
-      <div className={`max-w-xs lg:max-w-md px-4 py-2 ${getMessageClasses()}`}>
+      <div className={`max-w-xs lg:max-w-md px-4 py-2 ${messageClasses}`}>
         <p className="text-sm">{message.text}</p>
         {isQuestion && isCurrent && isWebSocketActive && (
           <div className="flex items-center mt-1">
@@ -145,10 +145,12 @@ const ChatMessage = ({
       </div>
     </div>
   )
-}
+})
+
+ChatMessage.displayName = 'ChatMessage'
 
 // 완료 메시지 컴포넌트
-const CompletionMessage = ({
+const CompletionMessage = React.memo(({
   isSaving,
   saveStatus
 }: {
@@ -163,48 +165,73 @@ const CompletionMessage = ({
       {saveStatus === 'error' && <p className="text-xs mt-1 text-red-600">❌ 저장 실패</p>}
     </div>
   </div>
-)
+))
+
+CompletionMessage.displayName = 'CompletionMessage'
 
 // 입력 폼 컴포넌트
-const ChatInput = ({
+const ChatInput = React.memo(({
   inputValue,
   setInputValue,
   handleSend,
-  isWebSocketActive
+  isInputDisabled,
+  getInputPlaceholder,
+  isSendButtonDisabled
 }: {
   inputValue: string
   setInputValue: (value: string) => void
   handleSend: () => void
-  isWebSocketActive: boolean
-}) => (
-  <div className="flex space-x-2">
-    <textarea
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-      rows={2}
-      placeholder={isWebSocketActive ? "웹소켓 통신 중..." : "메시지를 입력하세요..."}
-      disabled={isWebSocketActive}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey && !isWebSocketActive) {
-          e.preventDefault()
-          handleSend()
-        }
-      }}
-    />
-    <button
-      type="button"
-      onClick={handleSend}
-      disabled={!inputValue.trim() || isWebSocketActive}
-      className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-    >
-      Send
-    </button>
-  </div>
-)
+  isInputDisabled: () => boolean
+  getInputPlaceholder: () => string
+  isSendButtonDisabled: () => boolean
+}) => {
+  const [isComposing, setIsComposing] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isInputDisabled() && !isComposing) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  // disabled 상태가 false로 변경될 때 포커스 주기
+  useEffect(() => {
+    if (!isInputDisabled() && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [isInputDisabled])
+
+  return (
+    <div className="flex space-x-2">
+      <textarea
+        ref={textareaRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
+        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+        rows={2}
+        placeholder={getInputPlaceholder()}
+        disabled={isInputDisabled()}
+        onKeyDown={handleKeyDown}
+      />
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={isSendButtonDisabled()}
+        className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+      >
+        Send
+      </button>
+    </div>
+  )
+})
+
+ChatInput.displayName = 'ChatInput'
 
 // 재시작 버튼 컴포넌트
-const RestartButton = ({
+const RestartButton = React.memo(({
   handleRestart,
   isSaving
 }: {
@@ -229,7 +256,9 @@ const RestartButton = ({
       새로 시작하기
     </button>
   </div>
-)
+))
+
+RestartButton.displayName = 'RestartButton'
 
 // 메인 Chat 컴포넌트
 export default function Chat() {
@@ -244,6 +273,32 @@ export default function Chat() {
   const [isWebSocketActive, setIsWebSocketActive] = useState(false)
   const [webSocketResult, setWebSocketResult] = useState<string>('')
 
+  // 스크롤 관련 ref
+  const chatListRef = useRef<HTMLDivElement>(null)
+
+  // 스크롤을 하단으로 이동시키는 함수
+  const scrollToBottom = useCallback(() => {
+    if (chatListRef.current) {
+      chatListRef.current.scrollTop = chatListRef.current.scrollHeight
+    }
+  }, [])
+
+  // 입력 필드 상태를 결정하는 함수들
+  const isInputDisabled = useCallback(() => {
+    return isWebSocketActive || isSaving || isCompleted
+  }, [isWebSocketActive, isSaving, isCompleted])
+
+  const getInputPlaceholder = useCallback(() => {
+    if (isWebSocketActive) return "웹소켓 통신 중..."
+    if (isSaving) return "저장 중..."
+    if (isCompleted) return "대화가 완료되었습니다"
+    return "메시지를 입력하세요..."
+  }, [isWebSocketActive, isSaving, isCompleted])
+
+  const isSendButtonDisabled = useCallback(() => {
+    return !inputValue.trim() || isInputDisabled()
+  }, [inputValue, isInputDisabled])
+
   // 현재 질문인지 확인하는 함수
   const isCurrentQuestion = useCallback((index: number) => {
     const questions = chatHistory.filter(chat => chat.type === 'question')
@@ -252,6 +307,13 @@ export default function Chat() {
 
     return chatHistory[index]?.type === 'question' && currentQuestionText === currentItemText
   }, [chatHistory, currentQuestionIndex])
+
+  // 진행률 계산 메모이제이션
+  const progressText = useMemo(() => {
+    return getProgress(currentQuestionIndex, questions.length)
+  }, [currentQuestionIndex, questions.length])
+
+
 
   // 상태 초기화 함수
   const resetState = useCallback(() => {
@@ -299,6 +361,11 @@ export default function Chat() {
     }
   }, [currentQuestionIndex, questions, chatHistory])
 
+  // 채팅 히스토리가 변경될 때마다 스크롤을 하단으로 이동
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatHistory, scrollToBottom])
+
   // 답변 전송 핸들러
   const handleSend = useCallback(() => {
     if (inputValue.trim()) {
@@ -331,7 +398,10 @@ export default function Chat() {
   return (
     <div className="flex flex-col bg-gray-50 p-4">
       {/* 채팅 메시지 영역 */}
-      <div className="chat-list h-[500px] overflow-auto p-4 space-y-4 bg-white border border-gray-200 rounded-lg mb-4">
+      <div
+        ref={chatListRef}
+        className="chat-list h-[300px] overflow-auto p-4 space-y-4 bg-white border border-gray-200 rounded-lg mb-4"
+      >
         {chatHistory.map((message, index) => (
           <ChatMessage
             key={index}
@@ -354,7 +424,9 @@ export default function Chat() {
             inputValue={inputValue}
             setInputValue={setInputValue}
             handleSend={handleSend}
-            isWebSocketActive={isWebSocketActive}
+            isInputDisabled={isInputDisabled}
+            getInputPlaceholder={getInputPlaceholder}
+            isSendButtonDisabled={isSendButtonDisabled}
           />
         ) : (
           <RestartButton handleRestart={handleRestart} isSaving={isSaving} />
@@ -362,7 +434,7 @@ export default function Chat() {
 
         {!isCompleted && (
           <div className="mt-2 text-center text-gray-500 text-xs">
-            진행률: {getProgress(currentQuestionIndex, questions.length)}
+            진행률: {progressText}
           </div>
         )}
 
