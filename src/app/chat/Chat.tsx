@@ -11,11 +11,28 @@ type ChatMessage = {
 
 
 
+/**
+ * 진행률 계산 함수
+ * 
+ * @param currentIndex - 현재 질문 인덱스 (0부터 시작)
+ * @param total - 전체 질문 개수
+ * @returns 진행률 문자열 (예: "3/5")
+ */
 const getProgress = (currentIndex: number, total: number) => {
   return `${currentIndex + 1}/${total}`
 }
 
-// API 호출 함수들
+/**
+ * 질문-답변 저장 API 호출 함수
+ * 
+ * @param conversations - 저장할 질문-답변 쌍 배열
+ * @returns API 응답 데이터 (새로운 질문들 포함)
+ * 
+ * 동작:
+ * - POST /api/questionAnswerSave 엔드포인트 호출
+ * - 질문-답변 데이터를 서버에 전송
+ * - 서버에서 새로운 질문들을 생성하여 반환
+ */
 const saveQuestionAnswer = async (conversations: { question: string; answer: string }[]) => {
   try {
     console.log('API 호출 시작:', { conversations })
@@ -43,6 +60,16 @@ const saveQuestionAnswer = async (conversations: { question: string; answer: str
   }
 }
 
+/**
+ * 새로운 질문 가져오기 API 호출 함수
+ * 
+ * @returns 새로운 질문들 배열
+ * 
+ * 동작:
+ * - GET /api/questionAnswer 엔드포인트 호출
+ * - 서버에서 랜덤한 새로운 질문들을 반환
+ * - 4개 이상의 질문이 생성될 때 사용
+ */
 const getQuestionAnswer = async () => {
   try {
     const response = await fetch('/api/questionAnswer', {
@@ -68,7 +95,18 @@ const getQuestionAnswer = async () => {
 
 
 
-// 채팅 메시지 컴포넌트
+/**
+ * 채팅 메시지 컴포넌트
+ * 
+ * @param message - 표시할 메시지 객체
+ * @param index - 메시지 인덱스
+ * @param isCurrentQuestion - 현재 질문인지 확인하는 함수
+ * 
+ * 기능:
+ * - 질문, 답변, API 응답 메시지를 각각 다른 스타일로 표시
+ * - 질문과 API 응답은 왼쪽, 답변은 오른쪽 정렬
+ * - 현재 질문은 파란색, 이전 질문은 회색으로 구분
+ */
 const ChatMessage = React.memo(({
   message,
   index,
@@ -109,7 +147,22 @@ ChatMessage.displayName = 'ChatMessage'
 
 
 
-// 입력 폼 컴포넌트
+/**
+ * 입력 폼 컴포넌트
+ * 
+ * @param inputValue - 입력 필드 값
+ * @param setInputValue - 입력 값 설정 함수
+ * @param handleSend - 전송 핸들러
+ * @param isInputDisabled - 입력 비활성화 여부 확인 함수
+ * @param getInputPlaceholder - 플레이스홀더 텍스트 반환 함수
+ * @param isSendButtonDisabled - 전송 버튼 비활성화 여부 확인 함수
+ * 
+ * 기능:
+ * - 텍스트 입력 필드와 전송 버튼 제공
+ * - Enter 키로 전송 가능 (Shift+Enter는 줄바꿈)
+ * - 처리 중일 때 입력 비활성화
+ * - 자동 포커스 관리
+ */
 const ChatInput = React.memo(({
   inputValue,
   setInputValue,
@@ -258,7 +311,19 @@ export default function Chat({ questions }: { questions: string[] }) {
     return conversations
   }, [])
 
-  // timestamp 기반 차수별 질문-답변 추출 함수 (더 정확한 방법)
+  /**
+   * timestamp 기반 차수별 질문-답변 추출 함수
+   * 
+   * @param history - 채팅 히스토리 배열
+   * @param round - 추출할 차수
+   * @returns 해당 차수의 질문-답변 쌍 배열
+   * 
+   * 동작:
+   * - timestamp 순서로 정렬
+   * - api_response 메시지 제외
+   * - 지정된 차수의 질문-답변 쌍만 추출
+   * - API 호출 시 해당 차수의 데이터만 전송
+   */
   const extractConversationsByRoundWithTimestamp = useCallback((history: ChatMessage[], round: number) => {
     const conversations: { question: string; answer: string }[] = []
     console.log(`🔍 ${round}차 timestamp 기반 추출 시작 - 전체 히스토리:`, history)
@@ -298,28 +363,79 @@ export default function Chat({ questions }: { questions: string[] }) {
     return conversations
   }, [])
 
-  // 현재 차수 계산 함수
+  /**
+   * 현재 차수 계산 함수
+   * 
+   * @param history - 채팅 히스토리 배열
+   * @returns 현재 차수 (1차, 2차, 3차...)
+   * 
+   * 동작 원리:
+   * - api_response 메시지 개수를 세어서 현재 차수를 계산
+   * - api_response 개수 + 1 = 현재 차수
+   * 
+   * 예시:
+   * - api_response 0개 → 1차 (초기 질문들)
+   * - api_response 1개 → 2차 (첫 번째 추가 질문들)
+   * - api_response 2개 → 3차 (두 번째 추가 질문들)
+   */
   const getCurrentRound = useCallback((history: ChatMessage[]) => {
     const apiResponseCount = history.filter(msg => msg.type === 'api_response').length
     return apiResponseCount + 1 // api_response 개수 + 1 = 현재 차수
   }, [])
 
-  // 입력 필드 상태를 결정하는 함수들
+  /**
+   * 입력 필드 비활성화 여부 확인 함수
+   * 
+   * @returns 입력 필드가 비활성화되어야 하는지 여부
+   * 
+   * 조건:
+   * - 대화가 완료되었거나
+   * - API 처리 중일 때
+   */
   const isInputDisabled = useCallback(() => {
     return isCompleted || isProcessing
   }, [isCompleted, isProcessing])
 
+  /**
+   * 입력 필드 플레이스홀더 텍스트 반환 함수
+   * 
+   * @returns 현재 상태에 맞는 플레이스홀더 텍스트
+   * 
+   * 상태별 텍스트:
+   * - 처리 중: "처리 중..."
+   * - 완료: "대화가 완료되었습니다"
+   * - 기본: "메시지를 입력하세요..."
+   */
   const getInputPlaceholder = useCallback(() => {
     if (isProcessing) return "처리 중..."
     if (isCompleted) return "대화가 완료되었습니다"
     return "메시지를 입력하세요..."
   }, [isProcessing, isCompleted])
 
+  /**
+   * 전송 버튼 비활성화 여부 확인 함수
+   * 
+   * @returns 전송 버튼이 비활성화되어야 하는지 여부
+   * 
+   * 조건:
+   * - 입력값이 비어있거나
+   * - 입력 필드가 비활성화되어 있을 때
+   */
   const isSendButtonDisabled = useCallback(() => {
     return !inputValue.trim() || isInputDisabled()
   }, [inputValue, isInputDisabled])
 
-  // 현재 질문인지 확인하는 함수
+  /**
+   * 현재 질문인지 확인하는 함수
+   * 
+   * @param index - 확인할 메시지 인덱스
+   * @returns 해당 메시지가 현재 질문인지 여부
+   * 
+   * 동작:
+   * - 질문 타입 메시지들만 필터링
+   * - 현재 질문 인덱스와 비교
+   * - 현재 질문 스타일링에 사용
+   */
   const isCurrentQuestion = useCallback((index: number) => {
     const questions = chatHistory.filter(chat => chat.type === 'question')
     const currentQuestionText = questions[currentQuestionIndex]?.text
@@ -328,14 +444,32 @@ export default function Chat({ questions }: { questions: string[] }) {
     return chatHistory[index]?.type === 'question' && currentQuestionText === currentItemText
   }, [chatHistory, currentQuestionIndex])
 
-  // 진행률 계산 메모이제이션
+  /**
+   * 진행률 텍스트 계산 (메모이제이션)
+   * 
+   * @returns 현재 진행률을 나타내는 텍스트 (예: "3/5")
+   * 
+   * 메모이제이션:
+   * - currentQuestionIndex나 currentQuestions.length가 변경될 때만 재계산
+   */
   const progressText = useMemo(() => {
     return getProgress(currentQuestionIndex, currentQuestions.length)
   }, [currentQuestionIndex, currentQuestions.length])
 
 
 
-  // 상태 초기화 함수
+  /**
+   * 상태 초기화 함수
+   * 
+   * 동작:
+   * - 첫 번째 질문으로 채팅 히스토리 초기화
+   * - 현재 질문 인덱스를 0으로 설정
+   * - 완료 상태를 false로 설정
+   * - 입력 값을 초기화
+   * 
+   * 사용 시점:
+   * - 새로 시작하기 버튼 클릭 시
+   */
   const resetState = useCallback(() => {
     if (currentQuestions.length > 0) {
       setChatHistory([{
@@ -352,7 +486,18 @@ export default function Chat({ questions }: { questions: string[] }) {
 
 
 
-  // question이 설정되면 첫 번째 질문 추가
+  /**
+   * 초기 질문 설정 Effect
+   * 
+   * 동작:
+   * - currentQuestions가 설정되고 chatHistory가 비어있을 때
+   * - 첫 번째 질문을 chatHistory에 추가
+   * - 현재 질문 인덱스를 0으로 설정
+   * 
+   * 의존성:
+   * - currentQuestions: 질문 목록이 변경될 때
+   * - chatHistory.length: 채팅 히스토리가 비어있을 때만 실행
+   */
   useEffect(() => {
     if (currentQuestions.length > 0 && chatHistory.length === 0) {
       setChatHistory([{
@@ -367,12 +512,36 @@ export default function Chat({ questions }: { questions: string[] }) {
 
 
 
-  // 채팅 히스토리가 변경될 때마다 스크롤을 하단으로 이동
+  /**
+   * 스크롤 자동 이동 Effect
+   * 
+   * 동작:
+   * - chatHistory가 변경될 때마다 스크롤을 하단으로 이동
+   * - 새로운 메시지가 추가될 때 자동으로 스크롤
+   * 
+   * 의존성:
+   * - chatHistory: 메시지가 추가/변경될 때
+   * - scrollToBottom: 스크롤 함수가 변경될 때
+   */
   useEffect(() => {
     scrollToBottom()
   }, [chatHistory, scrollToBottom])
 
-  // 답변 전송 핸들러
+  /**
+   * 답변 전송 핸들러
+   * 
+   * 동작:
+   * - 사용자 입력을 답변으로 추가
+   * - 현재 차수 정보와 timestamp 추가
+   * - 다음 질문이 있으면 자동으로 추가
+   * - 모든 질문 완료 시 API 호출하여 새로운 질문 생성
+   * 
+   * 처리 흐름:
+   * 1. 답변 추가 (현재 차수, timestamp 포함)
+   * 2. 다음 질문이 있으면 추가
+   * 3. 모든 질문 완료 시 API 호출
+   * 4. 4개 이상 질문 생성 시 새로운 차수 시작
+   */
   const handleSend = useCallback(async () => {
     if (inputValue.trim()) {
       const currentRound = getCurrentRound(chatHistory)
@@ -488,7 +657,16 @@ export default function Chat({ questions }: { questions: string[] }) {
     }
   }, [inputValue, chatHistory, currentQuestionIndex, currentQuestions, extractConversations, extractConversationsByRound, extractConversationsByRoundWithTimestamp, getCurrentRound])
 
-  // 새로 시작하기
+  /**
+   * 새로 시작하기 핸들러
+   * 
+   * 동작:
+   * - 모든 상태를 초기화
+   * - 첫 번째 질문부터 다시 시작
+   * 
+   * 사용 시점:
+   * - 대화 완료 후 "새로 시작하기" 버튼 클릭 시
+   */
   const handleRestart = useCallback(() => {
     resetState()
   }, [resetState])
