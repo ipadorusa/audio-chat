@@ -156,8 +156,17 @@ const useRecording = (micState: MicrophoneState) => {
       // chunks 초기화
       chunksRef.current = [];
 
+      // WAV 형식 지원 확인 및 설정
+      let mimeType = 'audio/wav';
+
+      // 브라우저가 WAV를 지원하지 않으면 WebM으로 폴백
+      if (!MediaRecorder.isTypeSupported('audio/wav')) {
+        mimeType = 'audio/webm;codecs=opus';
+        console.log('WAV 형식이 지원되지 않아 WebM으로 폴백합니다.');
+      }
+
       const mediaRecorder = new MediaRecorder(recordingStream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: mimeType
       });
 
       mediaRecorderRef.current = mediaRecorder;
@@ -192,8 +201,9 @@ const useRecording = (micState: MicrophoneState) => {
 
         // 녹음 데이터 처리
         if (chunksRef.current.length > 0) {
-          const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          console.log('녹음 완료:', audioBlob.size, 'bytes');
+          // WAV 형식으로 Blob 생성 (브라우저가 지원하는 경우)
+          const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+          console.log('녹음 완료:', audioBlob.size, 'bytes', '형식:', mimeType);
 
           setRecordingState(prev => ({
             ...prev,
@@ -349,7 +359,9 @@ const Mic2 = () => {
 
     try {
       const formData = new FormData();
-      formData.append('audio', recordingState.audioBlob, 'recording.webm');
+      // 파일 확장자 결정 (WAV 또는 WebM)
+      const fileExtension = recordingState.audioBlob.type.includes('wav') ? 'wav' : 'webm';
+      formData.append('audio', recordingState.audioBlob, `recording.${fileExtension}`);
 
       console.log('API 전송 시작...');
 
@@ -363,6 +375,10 @@ const Mic2 = () => {
         const result = await response.json();
         console.log('API 전송 성공:', result);
         alert('녹음 파일이 성공적으로 전송되었습니다!');
+
+        // API 전송 성공 후 녹음 데이터 정리
+        clearRecording();
+        console.log('녹음 데이터 정리 완료');
       } else {
         throw new Error(`HTTP Error: ${response.status}`);
       }
@@ -465,7 +481,7 @@ const Mic2 = () => {
           <div>🎤 마이크: <strong>{micState.isOn ? '활성화' : '비활성화'}</strong></div>
           <div>🔴 녹음: <strong>{recordingState.isRecording ? '녹음 중...' : '대기 중'}</strong></div>
           {recordingState.audioBlob && (
-            <div>📁 파일: <strong>{Math.round(recordingState.audioBlob.size / 1024)}KB</strong></div>
+            <div>📁 파일: <strong>{Math.round(recordingState.audioBlob.size / 1024)}KB ({recordingState.audioBlob.type})</strong></div>
           )}
         </div>
       </div>
@@ -479,7 +495,7 @@ const Mic2 = () => {
           border: '1px solid #4CAF50'
         }}>
           <p style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 'bold' }}>
-            ✅ 녹음 완료! ({Math.round(recordingState.audioBlob.size / 1024)}KB)
+            ✅ 녹음 완료! ({Math.round(recordingState.audioBlob.size / 1024)}KB, {recordingState.audioBlob.type})
           </p>
 
           <div>
